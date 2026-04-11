@@ -144,10 +144,10 @@ export default function LoginPage() {
             </p>
             <div className="space-y-1 text-center text-xs text-muted-foreground">
               <p>
-                <strong>Admin:</strong> admin@fiscaliza.com / admin123
+                <strong>Admin:</strong> admin@fiscalizacao.com / admin123
               </p>
               <p>
-                <strong>Usuário:</strong> usuario@teste.com / 123456
+                <strong>Usuário:</strong> user@fiscalizacao.com / user123
               </p>
             </div>
           </div>

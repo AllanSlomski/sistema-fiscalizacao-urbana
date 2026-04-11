@@ -8,6 +8,7 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
+import * as api from '@/lib/api';
 import type { User, LoginRequest, RegisterRequest, ApiResponse, LoginResponse } from '@/types';
 
 interface AuthContextType {
@@ -17,7 +18,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   login: (credentials: LoginRequest) => Promise<ApiResponse<LoginResponse>>;
-  register: (data: RegisterRequest) => Promise<ApiResponse<User>>;
+  register: (data: RegisterRequest) => Promise<ApiResponse<LoginResponse>>;
   logout: () => void;
 }
 
@@ -65,15 +66,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
   }, []);
 
-  // Mock login - Replace with real API call
+  // Login with real API
   const login = useCallback(
     async (credentials: LoginRequest): Promise<ApiResponse<LoginResponse>> => {
       setIsLoading(true);
       try {
-        // Simulate API delay
-        await new Promise((resolve) => setTimeout(resolve, 800));
-
-        // Mock validation
+        // Validação básica antes de enviar
         if (!credentials.email || !credentials.password) {
           return {
             success: false,
@@ -84,52 +82,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           };
         }
 
-        // Mock users for demo
-        const mockUsers: Record<string, { user: User; password: string }> = {
-          'admin@fiscaliza.com': {
-            user: {
-              id: 1,
-              name: 'Administrador',
-              email: 'admin@fiscaliza.com',
-              role: 'ADMIN',
-              createdAt: new Date().toISOString(),
-            },
-            password: 'admin123',
-          },
-          'usuario@teste.com': {
-            user: {
-              id: 2,
-              name: 'Usuário Teste',
-              email: 'usuario@teste.com',
-              role: 'USER',
-              createdAt: new Date().toISOString(),
-            },
-            password: '123456',
-          },
-        };
+        // Chamar a API real
+        const result = await api.login({
+          email: credentials.email,
+          password: credentials.password,
+        });
 
-        const mockUser = mockUsers[credentials.email];
-        if (!mockUser || mockUser.password !== credentials.password) {
+        if (result.success && result.data.token && result.data.user) {
+          // Converter o usuário da API para o formato do frontend
+          const frontendUser: User = {
+            id: result.data.user.id,
+            name: result.data.user.name,
+            email: result.data.user.email,
+            role: result.data.user.role,
+            createdAt: new Date().toISOString(),
+          };
+
+          saveAuth(frontendUser, result.data.token);
+
           return {
-            success: false,
-            code: 'UNAUTHORIZED',
-            message: 'Email ou senha inválidos',
-            data: {} as LoginResponse,
-            errors: null,
+            success: true,
+            code: 'LOGIN_SUCCESS',
+            message: 'Login realizado com sucesso',
+            data: {
+              token: result.data.token,
+              user: frontendUser,
+            },
           };
         }
 
-        const mockToken = `mock_token_${Date.now()}`;
-        saveAuth(mockUser.user, mockToken);
-
         return {
-          success: true,
-          code: 'LOGIN_SUCCESS',
-          message: 'Login realizado com sucesso',
-          data: {
-            token: mockToken,
-            user: mockUser.user,
-          },
+          success: false,
+          code: result.code || 'UNAUTHORIZED',
+          message: result.message || 'Email ou senha inválidos',
+          data: {} as LoginResponse,
+          errors: result.errors,
+        };
+      } catch (error) {
+        console.error('[Auth] Login error:', error);
+        return {
+          success: false,
+          code: 'ERROR',
+          message: 'Erro ao realizar login. Tente novamente.',
+          data: {} as LoginResponse,
+          errors: null,
         };
       } finally {
         setIsLoading(false);
@@ -138,21 +134,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [saveAuth]
   );
 
-  // Mock register - Replace with real API call
+  // Register with real API
   const register = useCallback(
-    async (data: RegisterRequest): Promise<ApiResponse<User>> => {
+    async (data: RegisterRequest): Promise<ApiResponse<LoginResponse>> => {
       setIsLoading(true);
       try {
-        // Simulate API delay
-        await new Promise((resolve) => setTimeout(resolve, 800));
-
-        // Mock validation
+        // Validação básica
         if (!data.name || !data.email || !data.password) {
           return {
             success: false,
             code: 'VALIDATION_ERROR',
             message: 'Todos os campos são obrigatórios',
-            data: {} as User,
+            data: {} as LoginResponse,
             errors: [{ field: 'name', message: 'Preencha todos os campos' }],
           };
         }
@@ -162,28 +155,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             success: false,
             code: 'VALIDATION_ERROR',
             message: 'Senha deve ter pelo menos 6 caracteres',
-            data: {} as User,
+            data: {} as LoginResponse,
             errors: [{ field: 'password', message: 'Senha muito curta' }],
           };
         }
 
-        // Mock new user
-        const newUser: User = {
-          id: Date.now(),
+        // Chamar a API real
+        const result = await api.register({
           name: data.name,
           email: data.email,
-          role: 'USER',
-          createdAt: new Date().toISOString(),
-        };
+          password: data.password,
+        });
 
-        const mockToken = `mock_token_${Date.now()}`;
-        saveAuth(newUser, mockToken);
+        if (result.success && result.data.token && result.data.user) {
+          // Converter o usuário da API para o formato do frontend
+          const frontendUser: User = {
+            id: result.data.user.id,
+            name: result.data.user.name,
+            email: result.data.user.email,
+            role: result.data.user.role,
+            createdAt: new Date().toISOString(),
+          };
+
+          saveAuth(frontendUser, result.data.token);
+
+          return {
+            success: true,
+            code: 'USER_CREATED',
+            message: 'Conta criada com sucesso',
+            data: {
+              token: result.data.token,
+              user: frontendUser,
+            },
+          };
+        }
 
         return {
-          success: true,
-          code: 'USER_CREATED',
-          message: 'Conta criada com sucesso',
-          data: newUser,
+          success: false,
+          code: result.code || 'ERROR',
+          message: result.message || 'Erro ao criar conta',
+          data: {} as LoginResponse,
+          errors: result.errors,
+        };
+      } catch (error) {
+        console.error('[Auth] Register error:', error);
+        return {
+          success: false,
+          code: 'ERROR',
+          message: 'Erro ao criar conta. Tente novamente.',
+          data: {} as LoginResponse,
+          errors: null,
         };
       } finally {
         setIsLoading(false);

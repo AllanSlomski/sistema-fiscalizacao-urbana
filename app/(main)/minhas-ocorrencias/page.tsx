@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 export default function MyOccurrencesPage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const { occurrences, fetchOccurrences, isLoading } = useOccurrences();
+  const { occurrences, fetchOccurrences, isLoading, getUserOccurrences } = useOccurrences();
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -26,9 +26,13 @@ export default function MyOccurrencesPage() {
 
   useEffect(() => {
     if (user) {
-      fetchOccurrences({ userId: user.id, perPage: 50 });
+      // Buscar todas as ocorrências e filtrar localmente por usuário
+      fetchOccurrences({ perPage: 100 });
     }
   }, [user, fetchOccurrences]);
+
+  // Filtrar ocorrências do usuário atual
+  const myOccurrences = getUserOccurrences();
 
   if (authLoading) {
     return (
@@ -82,7 +86,7 @@ export default function MyOccurrencesPage() {
             </div>
           ))}
         </div>
-      ) : occurrences.length === 0 ? (
+      ) : myOccurrences.length === 0 ? (
         <Empty className="border">
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -104,7 +108,7 @@ export default function MyOccurrencesPage() {
         </Empty>
       ) : (
         <div className="space-y-4">
-          {occurrences.map((occurrence) => (
+          {myOccurrences.map((occurrence) => (
             <OccurrenceCard key={occurrence.id} occurrence={occurrence} />
           ))}
         </div>

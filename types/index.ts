@@ -67,6 +67,16 @@ export interface OccurrenceStatusHistory {
   createdAt: string;
 }
 
+// Comment
+export interface Comment {
+  id: number;
+  occurrenceId: number;
+  userId: number;
+  user?: User;
+  content: string;
+  createdAt: string;
+}
+
 // Notification
 export interface Notification {
   id: number;

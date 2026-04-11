@@ -94,11 +94,14 @@ export default function OccurrenceDetailPage({ params }: PageProps) {
   useEffect(() => {
     const fetchOccurrence = async () => {
       setLoading(true);
-      // Simulate loading
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      const occ = getOccurrenceById(parseInt(id));
-      setOccurrence(occ);
-      setLoading(false);
+      try {
+        const occ = await getOccurrenceById(parseInt(id));
+        setOccurrence(occ);
+      } catch (error) {
+        console.error('[OccurrenceDetail] Error fetching:', error);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchOccurrence();
