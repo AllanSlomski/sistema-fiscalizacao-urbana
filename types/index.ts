@@ -52,6 +52,8 @@ export interface Occurrence {
   currentStatus: OccurrenceStatus;
   priority?: number;
   recurrenceCount: number;
+  commentCount?: number;
+  imageUrl?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -178,6 +180,21 @@ export const STATUS_ORDER: OccurrenceStatus[] = [
   'EM_EXECUCAO',
   'FINALIZADO',
 ];
+
+// Priority Labels (1=Baixa, 2=Média, 3=Alta, 4=Urgente)
+export const PRIORITY_LABELS: Record<number, string> = {
+  1: 'Baixa',
+  2: 'Média',
+  3: 'Alta',
+  4: 'Urgente',
+};
+
+export const PRIORITY_COLORS: Record<number, string> = {
+  1: 'bg-slate-500',
+  2: 'bg-yellow-500',
+  3: 'bg-orange-500',
+  4: 'bg-red-600',
+};
 
 // Default Categories
 export const DEFAULT_CATEGORIES: Category[] = [

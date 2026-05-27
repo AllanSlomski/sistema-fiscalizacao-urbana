@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import * as api from '@/lib/api';
+import type { ApiComment } from '@/lib/api';
 import type {
   Occurrence,
   OccurrenceStatus,
@@ -29,25 +30,20 @@ interface OccurrencesContextType {
   currentPage: number;
   totalPages: number;
   filters: OccurrenceFilterParams;
-  userVotes: Set<number>;
   notifications: Notification[];
   unreadNotificationsCount: number;
   fetchOccurrences: (params?: OccurrenceFilterParams) => Promise<void>;
   fetchCategories: () => Promise<void>;
-  createOccurrence: (data: CreateOccurrenceRequest) => Promise<ApiResponse<Occurrence>>;
+  createOccurrence: (data: CreateOccurrenceRequest, imageFile?: File) => Promise<ApiResponse<Occurrence>>;
   updateStatus: (id: number, status: OccurrenceStatus) => Promise<ApiResponse<Occurrence>>;
   updatePriority: (id: number, priority: number) => Promise<ApiResponse<Occurrence>>;
   deleteOccurrence: (id: number) => Promise<ApiResponse<null>>;
   getOccurrenceById: (id: number) => Promise<Occurrence | undefined>;
   setFilters: (filters: OccurrenceFilterParams) => void;
-  toggleVote: (id: number) => Promise<ApiResponse<Occurrence>>;
-  hasVoted: (id: number) => boolean;
+  reportRecurrence: (id: number) => Promise<ApiResponse<{ recurrenceCount: number }>>;
   searchOccurrences: (query: string) => void;
-  // Comments (mantido local por enquanto - pode ser expandido com API)
-  comments: Record<number, Comment[]>;
   addComment: (occurrenceId: number, content: string) => Promise<ApiResponse<Comment>>;
-  getComments: (occurrenceId: number) => Comment[];
-  // Notifications
+  getComments: (occurrenceId: number) => Promise<Comment[]>;
   markNotificationAsRead: (id: number) => void;
   markAllNotificationsAsRead: () => void;
   getUserOccurrences: () => Occurrence[];
@@ -56,8 +52,6 @@ interface OccurrencesContextType {
 const OccurrencesContext = createContext<OccurrencesContextType | undefined>(undefined);
 
 // Storage key for votes (local, pois API não implementa)
-const VOTES_STORAGE_KEY = 'fiscaliza_votes';
-
 export function OccurrencesProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated } = useAuth();
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
@@ -67,32 +61,10 @@ export function OccurrencesProvider({ children }: { children: ReactNode }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [filters, setFilters] = useState<OccurrenceFilterParams>({});
-  const [userVotes, setUserVotes] = useState<Set<number>>(new Set());
-  const [comments, setComments] = useState<Record<number, Comment[]>>({});
   const [notifications, setNotifications] = useState<Notification[]>([]);
-
-  // Load votes from localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem(VOTES_STORAGE_KEY);
-    if (stored) {
-      try {
-        const votes = JSON.parse(stored);
-        setUserVotes(new Set(votes));
-      } catch {
-        localStorage.removeItem(VOTES_STORAGE_KEY);
-      }
-    }
-  }, []);
-
-  // Save votes to localStorage
-  const saveVotes = useCallback((votes: Set<number>) => {
-    localStorage.setItem(VOTES_STORAGE_KEY, JSON.stringify([...votes]));
-  }, []);
 
   // Fetch categories from API
   const fetchCategories = useCallback(async () => {
-    if (!isAuthenticated) return;
-    
     try {
       const result = await api.getCategories();
       if (result.success && Array.isArray(result.data)) {
@@ -101,14 +73,12 @@ export function OccurrencesProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('[Occurrences] Error fetching categories:', error);
     }
-  }, [isAuthenticated]);
+  }, []);
 
   // Fetch categories on mount
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchCategories();
-    }
-  }, [isAuthenticated, fetchCategories]);
+    fetchCategories();
+  }, [fetchCategories]);
 
   // Fetch occurrences from API
   const fetchOccurrences = useCallback(async (params?: OccurrenceFilterParams) => {
@@ -145,6 +115,8 @@ export function OccurrencesProvider({ children }: { children: ReactNode }) {
           currentStatus: occ.status,
           priority: occ.priority || 1,
           recurrenceCount: occ.recurrenceCount || 1,
+          commentCount: occ._count?.comments ?? 0,
+          imageUrl: occ.imageUrl,
           createdAt: occ.createdAt,
           updatedAt: occ.updatedAt,
         }));
@@ -168,7 +140,7 @@ export function OccurrencesProvider({ children }: { children: ReactNode }) {
 
   // Create occurrence via API
   const createOccurrence = useCallback(
-    async (data: CreateOccurrenceRequest): Promise<ApiResponse<Occurrence>> => {
+    async (data: CreateOccurrenceRequest, imageFile?: File): Promise<ApiResponse<Occurrence>> => {
       if (!user) {
         return {
           success: false,
@@ -181,11 +153,29 @@ export function OccurrencesProvider({ children }: { children: ReactNode }) {
 
       setIsLoading(true);
       try {
+        let imageUrl: string | undefined;
+
+        if (imageFile) {
+          const uploadResult = await api.uploadImage(imageFile);
+          if (uploadResult.success && uploadResult.data?.imageUrl) {
+            imageUrl = uploadResult.data.imageUrl;
+          } else {
+            return {
+              success: false,
+              code: 'UPLOAD_ERROR',
+              message: uploadResult.message || 'Erro ao fazer upload da imagem',
+              data: {} as Occurrence,
+              errors: null,
+            };
+          }
+        }
+
         const result = await api.createOccurrence({
           title: data.title,
           description: data.description,
           categoryId: data.categoryId,
           priority: 1,
+          imageUrl,
           address: {
             street: data.address.street,
             number: data.address.number,
@@ -195,8 +185,18 @@ export function OccurrencesProvider({ children }: { children: ReactNode }) {
           },
         });
 
+        // Duplicata detectada — repassar diretamente para a página tratar
+        if (result.code === 'OCCURRENCE_ALREADY_EXISTS') {
+          return {
+            success: false,
+            code: 'OCCURRENCE_ALREADY_EXISTS',
+            message: result.message || 'Ocorrência já registrada neste local.',
+            data: result.data as unknown as Occurrence,
+            errors: null,
+          };
+        }
+
         if (result.success && result.data) {
-          // Converter para formato do frontend
           const newOccurrence: Occurrence = {
             id: result.data.id,
             userId: user.id,
@@ -210,11 +210,11 @@ export function OccurrencesProvider({ children }: { children: ReactNode }) {
             currentStatus: 'ABERTO',
             priority: result.data.priority || 1,
             recurrenceCount: result.data.recurrenceCount || 1,
+            imageUrl: result.data.imageUrl,
             createdAt: result.data.createdAt,
             updatedAt: result.data.updatedAt,
           };
 
-          // Adicionar ao início da lista
           setOccurrences((prev) => [newOccurrence, ...prev]);
           setTotalCount((prev) => prev + 1);
 
@@ -339,6 +339,8 @@ export function OccurrencesProvider({ children }: { children: ReactNode }) {
             currentStatus: occ.status,
             priority: occ.priority || 1,
             recurrenceCount: occ.recurrenceCount || 1,
+            commentCount: occ._count?.comments ?? 0,
+            imageUrl: occ.imageUrl,
             createdAt: occ.createdAt,
             updatedAt: occ.updatedAt,
           };
@@ -483,10 +485,30 @@ export function OccurrencesProvider({ children }: { children: ReactNode }) {
     return occurrences.filter((o) => o.userId === user.id);
   }, [user, occurrences]);
 
-  // Comments (local implementation - could be expanded with API)
-  const getComments = useCallback((occurrenceId: number): Comment[] => {
-    return comments[occurrenceId] || [];
-  }, [comments]);
+  const getComments = useCallback(async (occurrenceId: number): Promise<Comment[]> => {
+    try {
+      const result = await api.getComments(occurrenceId);
+      if (result.success && Array.isArray(result.data)) {
+        return result.data.map((c: ApiComment) => ({
+          id: c.id,
+          occurrenceId: c.occurrenceId,
+          userId: c.userId,
+          user: c.user ? {
+            id: c.user.id,
+            name: c.user.name,
+            email: c.user.email,
+            role: 'USER' as const,
+            createdAt: new Date().toISOString(),
+          } : undefined,
+          content: c.content,
+          createdAt: c.createdAt,
+        }));
+      }
+    } catch (error) {
+      console.error('[Occurrences] Error fetching comments:', error);
+    }
+    return [];
+  }, []);
 
   const addComment = useCallback(
     async (occurrenceId: number, content: string): Promise<ApiResponse<Comment>> => {
@@ -500,26 +522,51 @@ export function OccurrencesProvider({ children }: { children: ReactNode }) {
         };
       }
 
-      const newComment: Comment = {
-        id: Date.now(),
-        occurrenceId,
-        userId: user.id,
-        user,
-        content,
-        createdAt: new Date().toISOString(),
-      };
+      try {
+        const result = await api.createComment({ occurrenceId, content });
 
-      setComments((prev) => ({
-        ...prev,
-        [occurrenceId]: [...(prev[occurrenceId] || []), newComment],
-      }));
+        if (result.success && result.data) {
+          const c = result.data;
+          const newComment: Comment = {
+            id: c.id,
+            occurrenceId: c.occurrenceId,
+            userId: c.userId,
+            user: c.user ? {
+              id: c.user.id,
+              name: c.user.name,
+              email: c.user.email,
+              role: 'USER' as const,
+              createdAt: new Date().toISOString(),
+            } : undefined,
+            content: c.content,
+            createdAt: c.createdAt,
+          };
 
-      return {
-        success: true,
-        code: 'COMMENT_ADDED',
-        message: 'Comentário adicionado',
-        data: newComment,
-      };
+          return {
+            success: true,
+            code: 'COMMENT_ADDED',
+            message: 'Comentário adicionado',
+            data: newComment,
+          };
+        }
+
+        return {
+          success: false,
+          code: result.code || 'ERROR',
+          message: result.message || 'Erro ao adicionar comentário',
+          data: {} as Comment,
+          errors: result.errors,
+        };
+      } catch (error) {
+        console.error('[Occurrences] Error adding comment:', error);
+        return {
+          success: false,
+          code: 'ERROR',
+          message: 'Erro ao adicionar comentário',
+          data: {} as Comment,
+          errors: null,
+        };
+      }
     },
     [user]
   );
@@ -537,65 +584,19 @@ export function OccurrencesProvider({ children }: { children: ReactNode }) {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   }, []);
 
-  // Votes (local implementation)
-  const hasVoted = useCallback(
-    (id: number): boolean => {
-      return userVotes.has(id);
-    },
-    [userVotes]
-  );
-
-  const toggleVote = useCallback(
-    async (id: number): Promise<ApiResponse<Occurrence>> => {
-      const occurrence = occurrences.find((o) => o.id === id);
-      if (!occurrence) {
-        return {
-          success: false,
-          code: 'NOT_FOUND',
-          message: 'Ocorrência não encontrada',
-          data: {} as Occurrence,
-          errors: null,
-        };
+  const reportRecurrence = useCallback(
+    async (id: number): Promise<ApiResponse<{ recurrenceCount: number }>> => {
+      const result = await api.reportRecurrence(id);
+      if (result.success && result.data?.recurrenceCount !== undefined) {
+        setOccurrences((prev) =>
+          prev.map((o) =>
+            o.id === id ? { ...o, recurrenceCount: result.data!.recurrenceCount } : o
+          )
+        );
       }
-
-      const alreadyVoted = userVotes.has(id);
-      const increment = alreadyVoted ? -1 : 1;
-
-      // Update local state
-      setOccurrences((prev) =>
-        prev.map((o) =>
-          o.id === id
-            ? {
-                ...o,
-                recurrenceCount: Math.max(0, o.recurrenceCount + increment),
-              }
-            : o
-        )
-      );
-
-      // Toggle vote state
-      setUserVotes((prev) => {
-        const newVotes = new Set(prev);
-        if (alreadyVoted) {
-          newVotes.delete(id);
-        } else {
-          newVotes.add(id);
-        }
-        saveVotes(newVotes);
-        return newVotes;
-      });
-
-      return {
-        success: true,
-        code: alreadyVoted ? 'VOTE_REMOVED' : 'VOTE_ADDED',
-        message: alreadyVoted ? 'Voto removido' : 'Voto registrado',
-        data: {
-          ...occurrence,
-          recurrenceCount: Math.max(0, occurrence.recurrenceCount + increment),
-        },
-      };
+      return result;
     },
-    [userVotes, occurrences, saveVotes]
+    [occurrences]
   );
 
   const value: OccurrencesContextType = {
@@ -606,7 +607,6 @@ export function OccurrencesProvider({ children }: { children: ReactNode }) {
     currentPage,
     totalPages,
     filters,
-    userVotes,
     notifications,
     unreadNotificationsCount,
     fetchOccurrences,
@@ -617,10 +617,8 @@ export function OccurrencesProvider({ children }: { children: ReactNode }) {
     deleteOccurrence,
     getOccurrenceById,
     setFilters,
-    toggleVote,
-    hasVoted,
+    reportRecurrence,
     searchOccurrences,
-    comments,
     addComment,
     getComments,
     markNotificationAsRead,

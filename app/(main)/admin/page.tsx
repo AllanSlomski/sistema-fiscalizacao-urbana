@@ -1,26 +1,26 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   MapPin,
-  Users,
   CheckCircle,
   Clock,
   AlertTriangle,
   Eye,
-  ChevronRight,
   Settings,
-  BarChart3,
   RefreshCw,
-  Trash2,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -28,34 +28,45 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useOccurrences } from '@/contexts/occurrences-context';
-import { useAuth } from '@/contexts/auth-context';
-import type { OccurrenceStatus } from '@/types';
-import { STATUS_LABELS, STATUS_COLORS, STATUS_ORDER } from '@/types';
-import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+} from "@/components/ui/select";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useOccurrences } from "@/contexts/occurrences-context";
+import { useAuth } from "@/contexts/auth-context";
+import type { OccurrenceStatus } from "@/types";
+import { STATUS_LABELS, STATUS_COLORS, STATUS_ORDER } from "@/types";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export default function AdminPage() {
   const router = useRouter();
   const { user, isAdmin, isLoading: authLoading } = useAuth();
-  const { occurrences, fetchOccurrences, updateStatus, isLoading, totalCount } = useOccurrences();
-  const [selectedStatuses, setSelectedStatuses] = useState<Record<number, OccurrenceStatus>>({});
+  const { occurrences, fetchOccurrences, updateStatus, isLoading, totalCount } =
+    useOccurrences();
+  const [selectedStatuses, setSelectedStatuses] = useState<
+    Record<number, OccurrenceStatus>
+  >({});
 
   useEffect(() => {
     // Redirect non-admin users
     if (!authLoading && (!user || !isAdmin)) {
-      toast.error('Acesso negado. Apenas administradores podem acessar esta página.');
-      router.push('/');
+      toast.error(
+        "Acesso negado. Apenas administradores podem acessar esta página.",
+      );
+      router.push("/");
     }
   }, [user, isAdmin, authLoading, router]);
 
@@ -63,7 +74,10 @@ export default function AdminPage() {
     fetchOccurrences({ perPage: 50 });
   }, [fetchOccurrences]);
 
-  const handleStatusChange = (occurrenceId: number, status: OccurrenceStatus) => {
+  const handleStatusChange = (
+    occurrenceId: number,
+    status: OccurrenceStatus,
+  ) => {
     setSelectedStatuses((prev) => ({ ...prev, [occurrenceId]: status }));
   };
 
@@ -73,23 +87,25 @@ export default function AdminPage() {
 
     const result = await updateStatus(occurrenceId, newStatus);
     if (result.success) {
-      toast.success('Status atualizado com sucesso!');
+      toast.success("Status atualizado com sucesso!");
       setSelectedStatuses((prev) => {
         const newState = { ...prev };
         delete newState[occurrenceId];
         return newState;
       });
     } else {
-      toast.error(result.message || 'Erro ao atualizar status');
+      toast.error(result.message || "Erro ao atualizar status");
     }
   };
 
   // Stats
   const stats = {
     total: occurrences.length,
-    open: occurrences.filter((o) => o.currentStatus === 'ABERTO').length,
-    inProgress: occurrences.filter((o) => ['EM_ANALISE', 'EM_EXECUCAO'].includes(o.currentStatus)).length,
-    done: occurrences.filter((o) => o.currentStatus === 'FINALIZADO').length,
+    open: occurrences.filter((o) => o.currentStatus === "ABERTO").length,
+    inProgress: occurrences.filter((o) =>
+      ["EM_ANALISE", "EM_EXECUCAO"].includes(o.currentStatus),
+    ).length,
+    done: occurrences.filter((o) => o.currentStatus === "FINALIZADO").length,
     highPriority: occurrences.filter((o) => (o.priority || 0) >= 4).length,
   };
 
@@ -120,7 +136,10 @@ export default function AdminPage() {
             Gerencie as ocorrências e atualize status
           </p>
         </div>
-        <Button variant="outline" onClick={() => fetchOccurrences({ perPage: 50 })}>
+        <Button
+          variant="outline"
+          onClick={() => fetchOccurrences({ perPage: 50 })}
+        >
           <RefreshCw className="mr-2 h-4 w-4" />
           Atualizar
         </Button>
@@ -148,9 +167,7 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.open}</div>
-            <p className="text-xs text-muted-foreground">
-              aguardando análise
-            </p>
+            <p className="text-xs text-muted-foreground">aguardando análise</p>
           </CardContent>
         </Card>
 
@@ -161,9 +178,7 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.inProgress}</div>
-            <p className="text-xs text-muted-foreground">
-              sendo tratadas
-            </p>
+            <p className="text-xs text-muted-foreground">sendo tratadas</p>
           </CardContent>
         </Card>
 
@@ -174,22 +189,20 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.done}</div>
-            <p className="text-xs text-muted-foreground">
-              resolvidas
-            </p>
+            <p className="text-xs text-muted-foreground">resolvidas</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Alta Prioridade</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Alta Prioridade
+            </CardTitle>
             <AlertTriangle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.highPriority}</div>
-            <p className="text-xs text-muted-foreground">
-              requerem atenção
-            </p>
+            <p className="text-xs text-muted-foreground">requerem atenção</p>
           </CardContent>
         </Card>
       </div>
@@ -263,8 +276,8 @@ export default function AdminPage() {
                         <TableCell>
                           <Badge
                             className={cn(
-                              'text-white',
-                              STATUS_COLORS[occurrence.currentStatus]
+                              "text-white",
+                              STATUS_COLORS[occurrence.currentStatus],
                             )}
                           >
                             {STATUS_LABELS[occurrence.currentStatus]}
@@ -283,9 +296,12 @@ export default function AdminPage() {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Select
-                              value={pendingStatus || ''}
+                              value={pendingStatus || ""}
                               onValueChange={(v) =>
-                                handleStatusChange(occurrence.id, v as OccurrenceStatus)
+                                handleStatusChange(
+                                  occurrence.id,
+                                  v as OccurrenceStatus,
+                                )
                               }
                             >
                               <SelectTrigger className="w-36">
@@ -296,7 +312,9 @@ export default function AdminPage() {
                                   <SelectItem
                                     key={status}
                                     value={status}
-                                    disabled={status === occurrence.currentStatus}
+                                    disabled={
+                                      status === occurrence.currentStatus
+                                    }
                                   >
                                     {STATUS_LABELS[status]}
                                   </SelectItem>
@@ -306,7 +324,9 @@ export default function AdminPage() {
                             {pendingStatus && (
                               <Button
                                 size="sm"
-                                onClick={() => handleUpdateStatus(occurrence.id)}
+                                onClick={() =>
+                                  handleUpdateStatus(occurrence.id)
+                                }
                                 disabled={isLoading}
                               >
                                 Salvar

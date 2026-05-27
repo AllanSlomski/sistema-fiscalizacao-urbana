@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import {
   createContext,
@@ -7,9 +7,15 @@ import {
   useEffect,
   useCallback,
   type ReactNode,
-} from 'react';
-import * as api from '@/lib/api';
-import type { User, LoginRequest, RegisterRequest, ApiResponse, LoginResponse } from '@/types';
+} from "react";
+import * as api from "@/lib/api";
+import type {
+  User,
+  LoginRequest,
+  RegisterRequest,
+  ApiResponse,
+  LoginResponse,
+} from "@/types";
 
 interface AuthContextType {
   user: User | null;
@@ -24,7 +30,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const AUTH_STORAGE_KEY = 'fiscaliza_auth';
+const AUTH_STORAGE_KEY = "fiscaliza_auth";
 
 interface StoredAuth {
   user: User;
@@ -71,14 +77,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (credentials: LoginRequest): Promise<ApiResponse<LoginResponse>> => {
       setIsLoading(true);
       try {
-        // Validação básica antes de enviar
         if (!credentials.email || !credentials.password) {
           return {
             success: false,
-            code: 'VALIDATION_ERROR',
-            message: 'Email e senha são obrigatórios',
+            code: "VALIDATION_ERROR",
+            message: "Email e senha são obrigatórios",
             data: {} as LoginResponse,
-            errors: [{ field: 'email', message: 'Preencha todos os campos' }],
+            errors: [{ field: "email", message: "Preencha todos os campos" }],
           };
         }
 
@@ -102,8 +107,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           return {
             success: true,
-            code: 'LOGIN_SUCCESS',
-            message: 'Login realizado com sucesso',
+            code: "LOGIN_SUCCESS",
+            message: "Login realizado com sucesso",
             data: {
               token: result.data.token,
               user: frontendUser,
@@ -113,17 +118,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         return {
           success: false,
-          code: result.code || 'UNAUTHORIZED',
-          message: result.message || 'Email ou senha inválidos',
+          code: result.code || "UNAUTHORIZED",
+          message: result.message || "Email ou senha inválidos",
           data: {} as LoginResponse,
           errors: result.errors,
         };
       } catch (error) {
-        console.error('[Auth] Login error:', error);
+        console.error("[Auth] Login error:", error);
         return {
           success: false,
-          code: 'ERROR',
-          message: 'Erro ao realizar login. Tente novamente.',
+          code: "ERROR",
+          message: "Erro ao realizar login. Tente novamente.",
           data: {} as LoginResponse,
           errors: null,
         };
@@ -131,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
       }
     },
-    [saveAuth]
+    [saveAuth],
   );
 
   // Register with real API
@@ -143,20 +148,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!data.name || !data.email || !data.password) {
           return {
             success: false,
-            code: 'VALIDATION_ERROR',
-            message: 'Todos os campos são obrigatórios',
+            code: "VALIDATION_ERROR",
+            message: "Todos os campos são obrigatórios",
             data: {} as LoginResponse,
-            errors: [{ field: 'name', message: 'Preencha todos os campos' }],
+            errors: [{ field: "name", message: "Preencha todos os campos" }],
           };
         }
 
         if (data.password.length < 6) {
           return {
             success: false,
-            code: 'VALIDATION_ERROR',
-            message: 'Senha deve ter pelo menos 6 caracteres',
+            code: "VALIDATION_ERROR",
+            message: "Senha deve ter pelo menos 6 caracteres",
             data: {} as LoginResponse,
-            errors: [{ field: 'password', message: 'Senha muito curta' }],
+            errors: [{ field: "password", message: "Senha muito curta" }],
           };
         }
 
@@ -181,8 +186,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           return {
             success: true,
-            code: 'USER_CREATED',
-            message: 'Conta criada com sucesso',
+            code: "USER_CREATED",
+            message: "Conta criada com sucesso",
             data: {
               token: result.data.token,
               user: frontendUser,
@@ -192,17 +197,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         return {
           success: false,
-          code: result.code || 'ERROR',
-          message: result.message || 'Erro ao criar conta',
+          code: result.code || "ERROR",
+          message: result.message || "Erro ao criar conta",
           data: {} as LoginResponse,
           errors: result.errors,
         };
       } catch (error) {
-        console.error('[Auth] Register error:', error);
+        console.error("[Auth] Register error:", error);
         return {
           success: false,
-          code: 'ERROR',
-          message: 'Erro ao criar conta. Tente novamente.',
+          code: "ERROR",
+          message: "Erro ao criar conta. Tente novamente.",
           data: {} as LoginResponse,
           errors: null,
         };
@@ -210,7 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
       }
     },
-    [saveAuth]
+    [saveAuth],
   );
 
   const logout = useCallback(() => {
@@ -222,7 +227,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     token,
     isLoading,
     isAuthenticated: !!user && !!token,
-    isAdmin: user?.role === 'ADMIN',
+    isAdmin: user?.role === "ADMIN",
     login,
     register,
     logout,
@@ -234,7 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }

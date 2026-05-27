@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, MapPin, Send } from 'lucide-react';
+import { ArrowLeft, MapPin, Send, ImagePlus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,6 +18,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useOccurrences } from '@/contexts/occurrences-context';
 import { useAuth } from '@/contexts/auth-context';
 import { toast } from 'sonner';
@@ -24,9 +35,18 @@ import type { CreateOccurrenceRequest } from '@/types';
 
 export default function NewOccurrencePage() {
   const router = useRouter();
-  const { categories, createOccurrence, isLoading } = useOccurrences();
+  const { categories, createOccurrence, reportRecurrence, isLoading } = useOccurrences();
   const { isAuthenticated } = useAuth();
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [duplicateDialog, setDuplicateDialog] = useState<{
+    open: boolean;
+    occurrenceId: number | null;
+    title: string;
+    recurrenceCount: number;
+  }>({ open: false, occurrenceId: null, title: '', recurrenceCount: 0 });
 
   const [formData, setFormData] = useState({
     title: '',
@@ -42,10 +62,34 @@ export default function NewOccurrencePage() {
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    // Clear error when field changes
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: '' }));
     }
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrors((prev) => ({ ...prev, image: 'Imagem deve ter no máximo 5MB' }));
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setErrors((prev) => ({ ...prev, image: 'Arquivo deve ser uma imagem' }));
+      return;
+    }
+
+    setErrors((prev) => ({ ...prev, image: '' }));
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const validateForm = () => {
@@ -99,11 +143,19 @@ export default function NewOccurrencePage() {
       },
     };
 
-    const result = await createOccurrence(request);
+    const result = await createOccurrence(request, imageFile ?? undefined);
 
     if (result.success) {
       toast.success('Ocorrência criada com sucesso!');
       router.push('/');
+    } else if (result.code === 'OCCURRENCE_ALREADY_EXISTS' && result.data) {
+      const existing = result.data as { id: number; title: string; recurrenceCount: number };
+      setDuplicateDialog({
+        open: true,
+        occurrenceId: existing.id,
+        title: existing.title,
+        recurrenceCount: existing.recurrenceCount,
+      });
     } else {
       toast.error(result.message || 'Erro ao criar ocorrência');
       if (result.errors) {
@@ -116,7 +168,40 @@ export default function NewOccurrencePage() {
     }
   };
 
+  const handleConfirmRecurrence = async () => {
+    if (!duplicateDialog.occurrenceId) return;
+    const result = await reportRecurrence(duplicateDialog.occurrenceId);
+    if (result.success) {
+      toast.success('Sua denúncia foi registrada na ocorrência existente!');
+      router.push(`/ocorrencia/${duplicateDialog.occurrenceId}`);
+    } else {
+      toast.error(result.message || 'Erro ao registrar recorrência');
+    }
+    setDuplicateDialog({ open: false, occurrenceId: null, title: '', recurrenceCount: 0 });
+  };
+
   return (
+    <>
+    <AlertDialog open={duplicateDialog.open} onOpenChange={(open) => setDuplicateDialog((d) => ({ ...d, open }))}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Ocorrência já registrada</AlertDialogTitle>
+          <AlertDialogDescription>
+            Já existe uma ocorrência similar neste local:{' '}
+            <strong>"{duplicateDialog.title}"</strong> com{' '}
+            <strong>{duplicateDialog.recurrenceCount} denúncia(s)</strong>.
+            <br /><br />
+            Deseja confirmar que o problema ainda persiste? Isso irá adicionar +1 à contagem de denúncias da ocorrência existente.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={handleConfirmRecurrence}>
+            Confirmar que ainda existe
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
@@ -194,6 +279,47 @@ export default function NewOccurrencePage() {
                 <FieldDescription>
                   Quanto mais detalhes, mais fácil será para resolver o problema
                 </FieldDescription>
+              </Field>
+
+              <Field>
+                <FieldLabel>Foto (opcional)</FieldLabel>
+                {imagePreview ? (
+                  <div className="relative w-full overflow-hidden rounded-md border">
+                    <Image
+                      src={imagePreview}
+                      alt="Preview"
+                      width={600}
+                      height={300}
+                      className="h-48 w-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={removeImage}
+                      className="absolute right-2 top-2 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isLoading}
+                    className="flex w-full cursor-pointer flex-col items-center gap-2 rounded-md border-2 border-dashed border-muted-foreground/30 px-4 py-8 text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary disabled:cursor-not-allowed"
+                  >
+                    <ImagePlus className="h-8 w-8" />
+                    <span className="text-sm">Clique para adicionar uma foto</span>
+                    <span className="text-xs">JPEG, PNG, WEBP — máx. 5MB</span>
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={handleImageChange}
+                />
+                {errors.image && <FieldError>{errors.image}</FieldError>}
               </Field>
             </FieldGroup>
 
@@ -286,5 +412,6 @@ export default function NewOccurrencePage() {
         </CardContent>
       </Card>
     </div>
+    </>
   );
 }

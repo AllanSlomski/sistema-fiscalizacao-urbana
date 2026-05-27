@@ -1,22 +1,24 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   MapPin,
   Clock,
-  ArrowBigUp,
   MessageSquare,
   Share2,
   User,
   AlertTriangle,
+  TriangleAlert,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { Occurrence } from '@/types';
-import { STATUS_LABELS, STATUS_COLORS } from '@/types';
+import { STATUS_LABELS, STATUS_COLORS, PRIORITY_LABELS, PRIORITY_COLORS } from '@/types';
 import { useOccurrences } from '@/contexts/occurrences-context';
 import { useAuth } from '@/contexts/auth-context';
 import { toast } from 'sonner';
@@ -27,31 +29,8 @@ interface OccurrenceCardProps {
 }
 
 export function OccurrenceCard({ occurrence }: OccurrenceCardProps) {
-  const { toggleVote, hasVoted } = useOccurrences();
+  const router = useRouter();
   const { isAuthenticated } = useAuth();
-  
-  const voted = hasVoted(occurrence.id);
-
-  const handleUpvote = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (!isAuthenticated) {
-      toast.error('Faça login para reportar esta ocorrência');
-      return;
-    }
-
-    const result = await toggleVote(occurrence.id);
-    if (result.success) {
-      if (result.code === 'VOTE_ADDED') {
-        toast.success('Obrigado por reportar! Isso ajuda a priorizar o problema.');
-      } else {
-        toast.info('Seu voto foi removido.');
-      }
-    } else {
-      toast.error(result.message || 'Erro ao processar voto');
-    }
-  };
 
   const handleShare = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -81,33 +60,38 @@ export function OccurrenceCard({ occurrence }: OccurrenceCardProps) {
   });
 
   const priorityLevel = occurrence.priority || 1;
-  const isHighPriority = priorityLevel >= 4;
+  const priorityLabel = PRIORITY_LABELS[priorityLevel] ?? 'Baixa';
+  const priorityColor = PRIORITY_COLORS[priorityLevel] ?? 'bg-slate-500';
+  const isHighPriority = priorityLevel >= 3;
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+  const imageUrl = occurrence.imageUrl
+    ? occurrence.imageUrl.startsWith('http')
+      ? occurrence.imageUrl
+      : `${backendUrl}${occurrence.imageUrl}`
+    : null;
 
   return (
     <Link href={`/ocorrencia/${occurrence.id}`}>
       <Card className="group transition-all hover:border-primary/50 hover:shadow-md">
         <CardContent className="p-0">
+          {imageUrl && (
+            <div className="relative h-40 w-full overflow-hidden rounded-t-lg">
+              <Image
+                src={imageUrl}
+                alt={occurrence.title}
+                fill
+                className="object-cover"
+              />
+            </div>
+          )}
           <div className="flex">
-            {/* Voting Column - Reddit Style */}
-            <div className="flex flex-col items-center gap-1 border-r bg-muted/30 px-3 py-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn(
-                  "h-8 w-8 transition-colors",
-                  voted 
-                    ? "bg-primary text-primary-foreground hover:bg-primary/90" 
-                    : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                )}
-                onClick={handleUpvote}
-                title={voted ? "Remover voto" : "Reportar ocorrência"}
-              >
-                <ArrowBigUp className={cn("h-5 w-5", voted && "fill-current")} />
-              </Button>
-              <span className={cn("text-sm font-semibold", voted && "text-primary")}>
+            {/* Recurrence Column */}
+            <div className="flex flex-col items-center justify-center gap-1 border-r bg-muted/30 px-3 py-4">
+              <TriangleAlert className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-semibold">
                 {occurrence.recurrenceCount}
               </span>
-              <span className="text-xs text-muted-foreground">reports</span>
+              <span className="text-xs text-muted-foreground">denúncias</span>
             </div>
 
             {/* Content */}
@@ -125,12 +109,10 @@ export function OccurrenceCard({ occurrence }: OccurrenceCardProps) {
                   <Clock className="h-3 w-3" />
                   {timeAgo}
                 </span>
-                {isHighPriority && (
-                  <Badge variant="destructive" className="gap-1">
-                    <AlertTriangle className="h-3 w-3" />
-                    Alta prioridade
-                  </Badge>
-                )}
+                <Badge className={cn('gap-1 text-white', priorityColor)}>
+                  {isHighPriority && <AlertTriangle className="h-3 w-3" />}
+                  {priorityLabel}
+                </Badge>
               </div>
 
               {/* Title */}
@@ -167,10 +149,14 @@ export function OccurrenceCard({ occurrence }: OccurrenceCardProps) {
                     variant="ghost"
                     size="sm"
                     className="h-8 gap-1 text-xs text-muted-foreground"
-                    onClick={(e) => e.preventDefault()}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      router.push(`/ocorrencia/${occurrence.id}#comentarios`);
+                    }}
                   >
                     <MessageSquare className="h-4 w-4" />
-                    Comentar
+                    {occurrence.commentCount ?? 0}
                   </Button>
                   <Button
                     variant="ghost"

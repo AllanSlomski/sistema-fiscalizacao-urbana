@@ -158,9 +158,7 @@ export interface Category {
 }
 
 export async function getCategories(): Promise<ApiResponse<Category[]>> {
-  return apiRequest<Category[]>("/categories", {
-    method: "GET",
-  });
+  return apiRequest<Category[]>("/categories", { method: "GET" }, false);
 }
 
 export async function createCategory(data: {
@@ -212,6 +210,7 @@ export interface CreateOccurrenceRequest {
   description?: string;
   categoryId: number;
   priority?: number;
+  imageUrl?: string;
   address: OccurrenceAddress;
 }
 
@@ -229,6 +228,7 @@ export interface Occurrence {
   status: OccurrenceStatus;
   priority: number;
   recurrenceCount: number;
+  imageUrl?: string;
   street: string;
   number: string;
   city: string;
@@ -246,6 +246,9 @@ export interface Occurrence {
     id: number;
     email: string;
     name: string;
+  };
+  _count?: {
+    comments: number;
   };
 }
 
@@ -316,6 +319,97 @@ export async function deleteOccurrence(id: number): Promise<ApiResponse<null>> {
   return apiRequest<null>(`/occurrences?id=${id}`, {
     method: "DELETE",
   });
+}
+
+// ==========================================
+// Endpoints de Comentários
+// ==========================================
+
+export interface CommentUser {
+  id: number;
+  name: string;
+  email: string;
+}
+
+export interface ApiComment {
+  id: number;
+  content: string;
+  occurrenceId: number;
+  userId: number;
+  user: CommentUser;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function getComments(
+  occurrenceId: number
+): Promise<ApiResponse<ApiComment[]>> {
+  return apiRequest<ApiComment[]>(`/comments?occurrenceId=${occurrenceId}`, {
+    method: "GET",
+  });
+}
+
+export async function createComment(data: {
+  occurrenceId: number;
+  content: string;
+}): Promise<ApiResponse<ApiComment>> {
+  return apiRequest<ApiComment>("/comments", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+// ==========================================
+// Endpoint de Votos
+// ==========================================
+
+export async function reportRecurrence(
+  id: number
+): Promise<ApiResponse<{ recurrenceCount: number }>> {
+  return apiRequest<{ recurrenceCount: number }>(`/occurrences/${id}/recurrence`, {
+    method: "POST",
+  });
+}
+
+// ==========================================
+// Endpoint de Upload
+// ==========================================
+
+export async function uploadImage(
+  file: File
+): Promise<ApiResponse<{ imageUrl: string }>> {
+  const token = getToken();
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/upload`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    const data = await response.json();
+    return data as ApiResponse<{ imageUrl: string }>;
+  } catch (error) {
+    console.error("[API] Upload error:", error);
+    return {
+      success: false,
+      code: "NETWORK_ERROR",
+      message: "Erro ao fazer upload da imagem.",
+      data: { imageUrl: "" },
+      errors: null,
+    };
+  }
+}
+
+// ==========================================
+// Endpoint de notificação ao governo
+// ==========================================
+
+export async function notifyGovernment(
+  id: number
+): Promise<ApiResponse<{ payload: unknown; governmentResponse: unknown }>> {
+  return apiRequest(`/occurrences/${id}/notify`, { method: "POST" });
 }
 
 // ==========================================

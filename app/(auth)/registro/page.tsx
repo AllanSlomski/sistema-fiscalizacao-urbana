@@ -1,26 +1,37 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { MapPin, Mail, Lock, Eye, EyeOff, User } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field';
-import { Spinner } from '@/components/ui/spinner';
-import { useAuth } from '@/contexts/auth-context';
-import { toast } from 'sonner';
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { MapPin, Mail, Lock, Eye, EyeOff, User } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldError,
+} from "@/components/ui/field";
+import { Spinner } from "@/components/ui/spinner";
+import { useAuth } from "@/contexts/auth-context";
+import { toast } from "sonner";
 
 export default function RegisterPage() {
   const router = useRouter();
   const { register, isLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -29,11 +40,13 @@ export default function RegisterPage() {
 
     // Basic validation
     const newErrors: Record<string, string> = {};
-    if (!name) newErrors.name = 'Nome é obrigatório';
-    if (!email) newErrors.email = 'Email é obrigatório';
-    if (!password) newErrors.password = 'Senha é obrigatória';
-    if (password.length < 6) newErrors.password = 'Senha deve ter pelo menos 6 caracteres';
-    if (password !== confirmPassword) newErrors.confirmPassword = 'As senhas não conferem';
+    if (!name) newErrors.name = "Nome é obrigatório";
+    if (!email) newErrors.email = "Email é obrigatório";
+    if (!password) newErrors.password = "Senha é obrigatória";
+    if (password.length < 6)
+      newErrors.password = "Senha deve ter pelo menos 6 caracteres";
+    if (password !== confirmPassword)
+      newErrors.confirmPassword = "As senhas não conferem";
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -43,10 +56,10 @@ export default function RegisterPage() {
     const result = await register({ name, email, password });
 
     if (result.success) {
-      toast.success('Conta criada com sucesso!');
-      router.push('/');
+      toast.success("Conta criada com sucesso!");
+      router.push("/");
     } else {
-      toast.error(result.message || 'Erro ao criar conta');
+      toast.error(result.message || "Erro ao criar conta");
       if (result.errors) {
         const errorMap: Record<string, string> = {};
         result.errors.forEach((err) => {
@@ -67,7 +80,7 @@ export default function RegisterPage() {
           <div>
             <CardTitle className="text-2xl">Criar conta</CardTitle>
             <CardDescription>
-              Junte-se à comunidade e ajude a melhorar Itajaí
+              Junte-se à comunidade e ajude o ambiente para todos!
             </CardDescription>
           </div>
         </CardHeader>
@@ -114,7 +127,7 @@ export default function RegisterPage() {
                   <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="password"
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? "text" : "password"}
                     placeholder="Mínimo 6 caracteres"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -137,12 +150,14 @@ export default function RegisterPage() {
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="confirmPassword">Confirmar senha</FieldLabel>
+                <FieldLabel htmlFor="confirmPassword">
+                  Confirmar senha
+                </FieldLabel>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="confirmPassword"
-                    type={showConfirmPassword ? 'text' : 'password'}
+                    type={showConfirmPassword ? "text" : "password"}
                     placeholder="Confirme sua senha"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
@@ -161,7 +176,9 @@ export default function RegisterPage() {
                     )}
                   </button>
                 </div>
-                {errors.confirmPassword && <FieldError>{errors.confirmPassword}</FieldError>}
+                {errors.confirmPassword && (
+                  <FieldError>{errors.confirmPassword}</FieldError>
+                )}
               </Field>
             </FieldGroup>
 

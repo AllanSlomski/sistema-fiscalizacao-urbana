@@ -1,26 +1,33 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Plus, MapPin } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
-import { Skeleton } from '@/components/ui/skeleton';
-import { OccurrenceCard } from '@/components/occurrence-card';
-import { useOccurrences } from '@/contexts/occurrences-context';
-import { useAuth } from '@/contexts/auth-context';
-import { toast } from 'sonner';
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Plus, MapPin } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import { OccurrenceCard } from "@/components/occurrence-card";
+import { useOccurrences } from "@/contexts/occurrences-context";
+import { useAuth } from "@/contexts/auth-context";
+import { toast } from "sonner";
 
 export default function MyOccurrencesPage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const { occurrences, fetchOccurrences, isLoading, getUserOccurrences } = useOccurrences();
+  const { fetchOccurrences, isLoading, getUserOccurrences } = useOccurrences();
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      toast.error('Você precisa estar logado para ver suas ocorrências');
-      router.push('/login');
+      toast.error("Você precisa estar logado para ver suas ocorrências");
+      router.push("/login");
     }
   }, [isAuthenticated, authLoading, router]);
 
@@ -94,7 +101,8 @@ export default function MyOccurrencesPage() {
             </EmptyMedia>
             <EmptyTitle>Você ainda não registrou ocorrências</EmptyTitle>
             <EmptyDescription>
-              Comece a contribuir com a comunidade registrando problemas urbanos que você identificar.
+              Comece a contribuir com a comunidade registrando problemas urbanos
+              que você identificar.
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
